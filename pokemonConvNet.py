@@ -14,6 +14,9 @@ history_file = 'data/hist.npy'
 model_file = 'data/model.h5'
 
 def getData():
+    '''
+    load data if exists or else creat dat from seed data
+    '''
     if os.path.isfile(data_x) and os.path.isfile(data_y):
         x = np.load(data_x)
         y = np.load(data_y)
@@ -43,11 +46,15 @@ def openMSPaint():
     os.system(editorstring)
 
 def drawPokemon(y):
+    '''
+    display image of pokemon to draw
+    open paint and return users drawing
+    '''
     template =  Image.new( 'L', (255,255), "white")
     template.save("img/new_image.bmp")
     img = Image.open("StarterPokemon/"+pokemon[y]+".bmp")
     arrimg = np.array(img)
-    print('draw this pokemon')
+    print('Draw this Pokemon')
     plt.axis('off')
     plt.title(pokemon[y])
     plt.imshow(arrimg)
@@ -57,6 +64,10 @@ def drawPokemon(y):
     return Image.open("img/new_image.bmp")
     
 def saveNewPokemon(new_x, new_y):
+    '''
+    add new pokemon to dataset 
+    after playing game
+    '''
     new_y = keras.utils.to_categorical(new_y,5)
     x,y = getData()
     x = np.append(x, new_x, axis=0)
@@ -65,6 +76,9 @@ def saveNewPokemon(new_x, new_y):
     np.save(data_y, y)
 
 def getModel():
+    '''
+    definition of our model
+    '''
     model = keras.Sequential([
             keras.layers.Conv2D(32, (3,3), padding='same', activation='relu',
                                 input_shape=(255,255,1)),
@@ -84,6 +98,9 @@ def getModel():
     return model
 
 def createModel():
+    '''
+    Create new model from scractch
+    '''
     x,y = getData()
     model = getModel()
     model.fit(x, y, epochs=8, batch_size=64, verbose=0)
@@ -91,12 +108,19 @@ def createModel():
     return model
 
 def loadModel():
+    '''
+    open saved model if exists, otherwise create model
+    '''
     if os.path.isfile(model_file):
         return keras.models.load_model(model_file)
     print ("model file not found creating model")
     return createModel()
 
 def evalModel():
+    '''
+    Use kfold evaluation on model to determine
+    accuracy and graph improvments
+    '''
     print("Evaluting model with new data")
     x,y = getData()
     kfolds = KFold(n_splits=5, random_state=None, shuffle=False)
@@ -107,7 +131,6 @@ def evalModel():
         y_train, y_test = y[train_index], y[test_index]
         m = getModel()
         m.fit(x_train, y_train, epochs=8, batch_size=64, verbose=0)
-        #print(m.evaluate(x_test, y_test))
         kfold_acc.append(m.evaluate(x_test, y_test)[1])
         del m
     acc = np.mean(kfold_acc)
@@ -126,9 +149,16 @@ def evalModel():
     np.save(history_file, hist)
 
 def play():
+    '''
+    main game loop
+    '''
     model = loadModel()
-    new_pokemon = randint(0,4)
+    
+    #pick random pokemon
+    new_pokemon = randint(0,4) 
+    #get users drawing
     input_img = np.array(drawPokemon(new_pokemon)).reshape(1,255,255,1)/255
+    # make prediction on users drawing
     pokemon_predict = model.predict(input_img)[0]
     pokemon_predict = np.argmax(pokemon_predict)
     print ("You drew this: ")
@@ -140,6 +170,7 @@ def play():
         print ("I was correct!")
     else:
         print ("You are not very good at drawing pokemon")
+    # add newly drawn poekmen to data set
     saveNewPokemon(input_img, new_pokemon)
 
 
@@ -149,10 +180,10 @@ def main():
         play()
         user_input = input("play again? (Y/N)")
         while (not(user_input.upper() == "Y" or user_input.upper() == "N")):
-            user_input = input("error")
+            user_input = input("Error, enter Y or N")
         choice = user_input.upper() == "Y"
-    #retrain convnet with new data from session
     #'''
+    #retrain convnet with new data from session
     createModel()
     evalModel()
 
