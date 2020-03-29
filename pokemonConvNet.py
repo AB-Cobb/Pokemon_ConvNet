@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import mean_absolute_error, accuracy_score
+from sklearn.model_selection import KFold
 import keras
 from PIL import Image
 import os
@@ -19,21 +19,26 @@ def getData():
         y = np.load(data_y)
         return (x,y)
     else:
-        numSeeds = 11
         x = []
         y = np.loadtxt("seed/keys.txt")
+        # Hot one encoding
         y = keras.utils.to_categorical(y,5)
+        numSeeds = y.shape[0]
         for i in range(1,numSeeds+1):
-            img = np.array(Image.open("seed/pokemon"+str(i)+".bmp"))  
+            img = np.array(Image.open("seed/pokemon"+str(i)+".bmp"))
             x.append(np.array(img))
-        x = np.array(x).reshape(numSeeds,255,255,1)
+        # Reshape and normailise x
+        x = np.array(x).reshape(numSeeds,255,255,1)/255
         return (x,y)
 
 def openMSPaint():
-    SaveDirectory=r'img'
-    sName = "new_image"
+    '''
+    Open MS paint with template image
+    '''
+    directory=r'img'
+    name = "new_image.bmp"
     ImageEditorPath=r'C:\WINDOWS\system32\mspaint.exe'
-    saveas=os.path.join(SaveDirectory,sName + '.bmp')
+    saveas=os.path.join(directory,name)
     editorstring='""%s" "%s"'% (ImageEditorPath,saveas) 
     os.system(editorstring)
 
@@ -59,53 +64,54 @@ def saveNewPokemon(new_x, new_y):
     np.save(data_x, x)
     np.save(data_y, y)
 
-def createModel():
-    x,y = getData()
+def getModel():
     model = keras.Sequential([
-            keras.layers.Conv2D(32, (3,3), padding='same', activation='relu', input_shape=(255,255,1)),
+            keras.layers.Conv2D(32, (3,3), padding='same', activation='relu',
+                                input_shape=(255,255,1)),
             keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Dropout(0.2),
+            keras.layers.Conv2D(64, (3,3), padding='same', activation='relu',
+                                input_shape=(255,255,1)),
+            keras.layers.MaxPooling2D((2, 2)),
+            keras.layers.Conv2D(128, (3,3), padding='same', activation='relu',
+                                input_shape=(255,255,1)),
+            keras.layers.MaxPooling2D((2, 2)),
             keras.layers.Flatten(),        
             keras.layers.Dense(128, activation='relu'),
             keras.layers.Dense(5, activation='softmax'),
-            ]) 
-    model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
-    hist = model.fit(x,y, epochs=8, batch_size=64)
-    return (model,hist)
-
-def getModel():
-    if os.path.isfile(model_file):
-        return keras.models.load_model(model_file)
-    model, h = createModel()
+            ])
+    model.compile(optimizer="adam", loss='categorical_crossentropy',
+                  metrics=['accuracy'])
     return model
 
-def play():
+def createModel():
+    x,y = getData()
     model = getModel()
-    new_pokemon = randint(0,4)
-    input_img = np.array(drawPokemon(new_pokemon)).reshape(1,255,255,1)
-    pokemon_predict = model.predict(input_img)[0]
-    for i in range(0,5):
-        if pokemon_predict[i] == 1:
-            pokemon_predict = i
-            break
-    print ("You drew this: ")
-    plt.axis('off')
-    plt.imshow(input_img[0].reshape(255,255), cmap='gray')
-    plt.show()
-    print ("I think that is a ", pokemon[pokemon_predict])
-    if (pokemon_predict == new_pokemon):
-        print ("I was correct!")
-    else:
-        print ("You are not very good at drawing pokemon")
-    saveNewPokemon(input_img, new_pokemon)
+    model.fit(x, y, epochs=8, batch_size=64, verbose=0)
+    model.save(model_file)
+    return model
 
-    
+def loadModel():
+    if os.path.isfile(model_file):
+        return keras.models.load_model(model_file)
+    print ("model file not found creating model")
+    return createModel()
 
-def retrain():
-    m,h = createModel()
-    m.save(model_file)
-    num_games =  np.load(data_y).shape[0]
-    acc = h.history['accuracy'][-1]
+def evalModel():
+    print("Evaluting model with new data")
+    x,y = getData()
+    kfolds = KFold(n_splits=5, random_state=None, shuffle=False)
+    num_games =  y.shape[0]
+    kfold_acc = []
+    for train_index, test_index in kfolds.split(x):
+        x_train, x_test = x[train_index], x[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        m = getModel()
+        m.fit(x_train, y_train, epochs=8, batch_size=64, verbose=0)
+        #print(m.evaluate(x_test, y_test))
+        kfold_acc.append(m.evaluate(x_test, y_test)[1])
+        del m
+    acc = np.mean(kfold_acc)
+    print ('Current Accracy is: ',acc)
     hist = np.array([[num_games,acc]])
     if os.path.isfile(history_file):
         hist = np.load(history_file)
@@ -119,6 +125,24 @@ def retrain():
     plt.show()
     np.save(history_file, hist)
 
+def play():
+    model = loadModel()
+    new_pokemon = randint(0,4)
+    input_img = np.array(drawPokemon(new_pokemon)).reshape(1,255,255,1)/255
+    pokemon_predict = model.predict(input_img)[0]
+    pokemon_predict = np.argmax(pokemon_predict)
+    print ("You drew this: ")
+    plt.axis('off')
+    plt.imshow(input_img[0].reshape(255,255), cmap='gray')
+    plt.show()
+    print ("I think that is a ", pokemon[pokemon_predict])
+    if (pokemon_predict == new_pokemon):
+        print ("I was correct!")
+    else:
+        print ("You are not very good at drawing pokemon")
+    saveNewPokemon(input_img, new_pokemon)
+
+
 def main():
     choice = True
     while choice:
@@ -128,7 +152,9 @@ def main():
             user_input = input("error")
         choice = user_input.upper() == "Y"
     #retrain convnet with new data from session
-    retrain()
+    #'''
+    createModel()
+    evalModel()
 
 if __name__ == "__main__":
     main()
