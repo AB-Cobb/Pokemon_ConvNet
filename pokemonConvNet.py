@@ -15,7 +15,7 @@ model_file = 'data/model.h5'
 
 def getData():
     '''
-    load data if exists or else creat dat from seed data
+    load data if exists or else create dat from seed data
     '''
     if os.path.isfile(data_x) and os.path.isfile(data_y):
         x = np.load(data_x)
@@ -141,7 +141,7 @@ def evalModel():
         hist = np.append(hist, [[num_games,acc]], axis=0)
     acc_list = hist[...,1]
     num_list = hist[...,0]
-    plt.scatter(num_list,acc_list)
+    plt.plot(num_list,acc_list)
     plt.title("ConvNet Improvments")
     plt.ylabel("ConvNet Accuracy")
     plt.xlabel("Number of Pokemon Drawn")
@@ -170,11 +170,12 @@ def play():
         print ("I was correct!")
     else:
         print ("You are not very good at drawing pokemon")
-    # add newly drawn poekmen to data set
+    # add newly drawn pokemon to data set
     saveNewPokemon(input_img, new_pokemon)
 
 
 def main():
+    
     choice = True
     while choice:
         play()
@@ -189,4 +190,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
 
