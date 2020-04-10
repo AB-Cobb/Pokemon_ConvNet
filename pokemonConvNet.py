@@ -1,3 +1,12 @@
+'''
+******* Pokemon Convnet ********
+Final Project for Comp3133
+
+@author Andrew Cobb
+        Guseppi Ragusa
+        Arsalan Farooqui
+'''
+
 import numpy as np
 from sklearn.model_selection import KFold
 import keras
@@ -134,7 +143,7 @@ def evalModel():
         kfold_acc.append(m.evaluate(x_test, y_test)[1])
         del m
     acc = np.mean(kfold_acc)
-    print ('Current Accracy is: ',acc)
+    print ('Current Accuracy is: ',acc)
     hist = np.array([[num_games,acc]])
     if os.path.isfile(history_file):
         hist = np.load(history_file)
